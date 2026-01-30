@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sword Ninja: Neon Slash</title>
+    <!-- Sci-Fi Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-bg: rgba(8, 10, 15, 0.95);
+            --text-color: #e0f7fa;
+            --accent-color: #00ffcc;
+            --danger-color: #ff0055;
+            --gold: #ffd700;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+        body {
+            background-color: #000;
+            color: var(--text-color);
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas { position: absolute; top: 0; left: 0; z-index: 1; display: block; }
+
+        #damage-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 60%, rgba(255, 0, 0, 0.4) 100%);
+            opacity: 0; transition: opacity 0.2s; z-index: 5; pointer-events: none;
+        }
+
+        #hud-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; pointer-events: none; padding: 20px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+        }
+
+        .hud-text { 
+            font-size: 24px; font-weight: 700; 
+            text-shadow: 0 0 5px var(--accent-color);
+        }
+        
+        .score-container {
+            display: flex; flex-direction: column; align-items: flex-start;
+        }
+
+        .mode-badge {
+            background: rgba(0,0,0,0.8); border: 1px solid var(--accent-color); padding: 6px 12px;
+            border-radius: 4px; font-size: 14px; color: var(--accent-color); margin-bottom: 8px;
+            text-transform: uppercase; letter-spacing: 2px; font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
+        }
+
+        /* --- MENU STYLES --- */
+        #modal-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 100; display: flex; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.6); pointer-events: auto;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal {
+            background: var(--ui-bg); padding: 40px 60px; border-radius: 8px;
+            text-align: center; border: 2px solid var(--accent-color);
+            box-shadow: 0 0 50px rgba(0, 255, 204, 0.15), inset 0 0 20px rgba(0,0,0,0.8);
+            max-width: 700px; width: 90%; animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+        }
+
+        /* Decorative Corners */
+        .modal::before, .modal::after {
+            content: ''; position: absolute; width: 20px; height: 20px;
+            border: 2px solid var(--accent-color); transition: all 0.3s;
+        }
+        .modal::before { top: -2px; left: -2px; border-right: none; border-bottom: none; }
+        .modal::after { bottom: -2px; right: -2px; border-left: none; border-top: none; }
+
+        @keyframes slideIn { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-size: 3.5rem; margin-bottom: 10px; color: #fff; text-transform: uppercase;
+            letter-spacing: 4px; text-shadow: 0 0 20px var(--accent-color), 2px 2px 0px #000;
+        }
+
+        h2 { color: var(--accent-color); margin-bottom: 30px; font-size: 1.2rem; letter-spacing: 2px; }
+        
+        .high-score-row {
+            display: flex; justify-content: space-between; margin-bottom: 30px;
+            background: rgba(255,255,255,0.05); padding: 15px; border-radius: 4px;
+            border-left: 4px solid var(--gold);
+        }
+        
+        .hs-item { display: flex; flex-direction: column; align-items: center; flex: 1; }
+        .hs-label { font-size: 0.8rem; color: #888; margin-bottom: 5px; text-transform: uppercase; }
+        .hs-value { font-size: 1.5rem; color: var(--gold); font-weight: bold; text-shadow: 0 0 10px var(--gold); }
+
+        .btn-group { display: flex; gap: 20px; justify-content: center; margin-top: 20px; }
+
+        button {
+            padding: 20px 40px; font-size: 1.1rem; font-weight: bold; border-radius: 4px;
+            cursor: pointer; transition: all 0.2s; border: none; text-transform: uppercase;
+            font-family: 'Orbitron', sans-serif; letter-spacing: 2px;
+            position: relative; overflow: hidden; min-width: 180px;
+        }
+
+        button::after {
+            content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: 0.5s;
+        }
+        
+        button:hover::after { left: 100%; }
+
+        button.primary { 
+            background: rgba(0, 255, 204, 0.1); 
+            border: 2px solid var(--accent-color); 
+            color: var(--accent-color);
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.2); 
+        }
+        button.primary:hover { 
+            background: var(--accent-color); color: #000; 
+            box-shadow: 0 0 30px var(--accent-color); 
+        }
+
+        button.danger { 
+            background: rgba(255, 0, 85, 0.1); 
+            border: 2px solid var(--danger-color); 
+            color: var(--danger-color);
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.2); 
+        }
+        button.danger:hover { 
+            background: var(--danger-color); color: #fff; 
+            box-shadow: 0 0 30px var(--danger-color); 
+        }
+
+        button.menu { background: #333; color: #fff; border: 1px solid #555; }
+        button.menu:hover { background: #555; }
+
+        .mode-desc {
+            display: flex; gap: 20px; text-align: left; margin-bottom: 30px;
+        }
+        .mode-info { 
+            flex: 1; background: rgba(0,0,0,0.4); padding: 15px; 
+            border-radius: 4px; border: 1px solid #444; 
+            transition: transform 0.2s;
+        }
+        .mode-info:hover { transform: translateY(-3px); border-color: #666; }
+        
+        .mode-info h3 { color: #fff; margin-bottom: 8px; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+        .mode-info p { font-size: 0.8rem; margin: 0; color: #aaa; line-height: 1.4; }
+
+        .new-record {
+            color: var(--gold);
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            font-weight: bold;
+            animation: pulse 1s infinite;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); text-shadow: 0 0 10px var(--gold); }
+            50% { transform: scale(1.1); text-shadow: 0 0 25px var(--gold); }
+            100% { transform: scale(1); text-shadow: 0 0 10px var(--gold); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+    <div id="damage-overlay"></div>
+
+    <div id="hud-layer">
+        <div class="score-container">
+            <div class="mode-badge" id="modeDisplay">Mode: None</div>
+            <div class="hud-text" style="color: var(--accent-color);">SCORE: <span id="scoreDisplay">0</span></div>
+        </div>
+        <div class="hud-text" style="color: var(--danger-color);">HP: <span id="healthDisplay">3</span></div>
+    </div>
+
+    <div id="modal-layer">
+        <!-- Start Screen -->
+        <div id="startScreen" class="modal">
+            <h1>Neon Slash</h1>
+            <h2>Protect the Grid. Slash the Shadows.</h2>
+            
+            <div class="high-score-row">
+                <div class="hs-item">
+                    <span class="hs-label">Classic Best</span>
+                    <span class="hs-value" id="menuHsClassic">0</span>
+                </div>
+                <div class="hs-item">
+                    <span class="hs-label">Hardcore Best</span>
+                    <span class="hs-value" id="menuHsHardcore">0</span>
+                </div>
+            </div>
+
+            <div class="mode-desc">
+                <div class="mode-info">
+                    <h3>⚔️ Classic Mode</h3>
+                    <p>Arcade-style layout. Centered, large keyboard for precision slicing.</p>
+                </div>
+                <div class="mode-info">
+                    <h3>💀 Hardcore Mode</h3>
+                    <p>Orbiting keys. 360-degree threats requiring extreme reflexes.</p>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="primary" id="btnClassic">Play Classic</button>
+                <button class="danger" id="btnHardcore">Play Hardcore</button>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="modal hidden">
+            <h1 style="color: var(--danger-color); text-shadow: 0 0 20px var(--danger-color);">System Failure</h1>
+            <h2 id="endModeTitle">Mode: None</h2>
+            
+            <div id="newRecordMsg" class="new-record hidden">New High Score!</div>
+            
+            <div class="mode-desc" style="margin-bottom: 20px; background: rgba(255,255,255,0.02);">
+                <div class="hs-item">
+                    <span class="hs-label">Score</span>
+                    <span class="hs-value" style="color: #fff;" id="finalScore">0</span>
+                </div>
+                <div class="hs-item">
+                    <span class="hs-label">Best</span>
+                    <span class="hs-value" id="endHighScore">0</span>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="menu" id="btnMenu">Main Menu</button>
+                <button class="primary" id="btnRetry">Retry</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // UI Elements
+            const modalLayer = document.getElementById('modal-layer');
+            const startScreen = document.getElementById('startScreen');
+            const gameOverScreen = document.getElementById('gameOverScreen');
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            const healthDisplay = document.getElementById('healthDisplay');
+            const finalScoreDisplay = document.getElementById('finalScore');
+            const modeDisplay = document.getElementById('modeDisplay');
+            const endModeTitle = document.getElementById('endModeTitle');
+            const damageOverlay = document.getElementById('damage-overlay');
+            const newRecordMsg = document.getElementById('newRecordMsg');
+            const endHighScoreDisplay = document.getElementById('endHighScore');
+            const menuHsClassic = document.getElementById('menuHsClassic');
+            const menuHsHardcore = document.getElementById('menuHsHardcore');
+
+            // High Score Logic
+            let highScores = {
+                classic: parseInt(localStorage.getItem('hs_classic')) || 0,
+                hardcore: parseInt(localStorage.getItem('hs_hardcore')) || 0
+            };
+
+            function updateMenuHighScores() {
+                menuHsClassic.textContent = highScores.classic;
+                menuHsHardcore.textContent = highScores.hardcore;
+            }
+            updateMenuHighScores();
+
+            // Game State
+            let gameState = {
+                isPlaying: false,
+                mode: 'classic',
+                score: 0,
+                health: 3,
+                width: window.innerWidth,
+                height: window.innerHeight,
+                lastTime: 0
+            };
+
+            // Image Background
+            const bgImage = new Image();
+            bgImage.src = "https://z-cdn-media.chatglm.cn/files/761a09cb-b857-43ee-8f79-d8a4da1d4df2.png?auth_key=1869754501-bed04da1ee0d463790c690479b04e5e8-0-26675d925b527db2236911f8d094b3e9";
+
+            const CONFIG = {
+                ninjaSize: 25,
+                enemySize: 18,
+                enemyBaseSpeed: 1.8,
+                spawnRate: 1200,
+                slashDuration: 120,
+                dashInvulnerability: 250
+            };
+
+            let keys = [];
+            let enemies = [];
+            let particles = [];
+            let ninja = { x:0, y:0, isDashing:false, dashStartPos:{x:0,y:0}, dashTargetPos:{x:0,y:0}, dashStartTime:0, invulnerableUntil:0 };
+            let spawnTimer = 0;
+            let animationFrameId;
+            let screenShake = 0;
+
+            // --- Graphics ---
+
+            function drawNinja(ctx, x, y, opacity = 1) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.globalAlpha = opacity;
+
+                // Shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.beginPath(); ctx.ellipse(0, 25, 18, 6, 0, 0, Math.PI*2); ctx.fill();
+
+                // Body
+                ctx.fillStyle = '#2a2a35';
+                ctx.beginPath();
+                ctx.moveTo(0, -22);
+                ctx.lineTo(14, 12);
+                ctx.lineTo(-14, 12);
+                ctx.fill();
+
+                // Belt
+                ctx.fillStyle = '#ffd700';
+                ctx.fillRect(-14, 0, 28, 4);
+
+                // Head
+                ctx.fillStyle = '#e0c0a0';
+                ctx.beginPath();
+                ctx.arc(0, -16, 9, 0, Math.PI*2);
+                ctx.fill();
+
+                // Headband
+                ctx.strokeStyle = '#d00';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(-9, -20);
+                ctx.lineTo(9, -20);
+                ctx.lineTo(14, -28);
+                ctx.stroke();
+
+                // Mask
+                ctx.fillStyle = '#2a2a35';
+                ctx.fillRect(-8, -16, 16, 5);
+
+                // Sword
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(-14, -4, 7, 3); 
+                ctx.fillStyle = '#ddd';
+                ctx.fillRect(-7, -4, 28, 3); 
+
+                ctx.restore();
+            }
+
+            function drawMonster(ctx, x, y, scale = 1) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.scale(scale, scale);
+
+                ctx.fillStyle = '#440033';
+                ctx.beginPath();
+                ctx.moveTo(0, 12);
+                ctx.bezierCurveTo(16, 12, 20, -5, 14, -14);
+                ctx.bezierCurveTo(6, -20, -6, -20, -14, -14);
+                ctx.bezierCurveTo(-20, -5, -16, 12, 0, 12);
+                ctx.fill();
+
+                ctx.fillStyle = '#110011';
+                for(let i=0; i<4; i++) {
+                    ctx.rotate(Math.PI/2);
+                    ctx.beginPath();
+                    ctx.moveTo(14, -3);
+                    ctx.lineTo(20, 0);
+                    ctx.lineTo(14, 3);
+                    ctx.fill();
+                }
+
+                ctx.fillStyle = '#ff3333';
+                ctx.shadowColor = '#ff3333';
+                ctx.shadowBlur = 15;
+                ctx.beginPath(); ctx.arc(-5, -7, 2.5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(5, -7, 2.5, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0;
+
+                ctx.restore();
+            }
+
+            // --- Initialization ---
+
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                gameState.width = canvas.width;
+                gameState.height = canvas.height;
+                
+                if (!gameState.isPlaying) {
+                    initKeys(gameState.mode);
+                    ninja.x = canvas.width / 2;
+                    ninja.y = canvas.height / 2;
+                } else {
+                    initKeys(gameState.mode);
+                }
+            }
+            window.addEventListener('resize', resize);
+
+            function initKeys(mode) {
+                keys = [];
+                const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                
+                if (mode === 'hardcore') {
+                    const centerX = canvas.width / 2;
+                    const centerY = canvas.height / 2;
+                    const radius = Math.min(canvas.width, canvas.height) * 0.35;
+                    const angleStep = (Math.PI * 2) / alphabet.length;
+
+                    for (let i = 0; i < alphabet.length; i++) {
+                        const angle = i * angleStep - Math.PI / 2;
+                        keys.push({
+                            char: alphabet[i],
+                            x: centerX + Math.cos(angle) * radius,
+                            y: centerY + Math.sin(angle) * radius,
+                            w: 45, h: 45
+                        });
+                    }
+                } else {
+                    // Classic Mode: Responsive Big Keyboard
+                    const rows = [
+                        "QWERTYUIOP",
+                        "ASDFGHJKL",
+                        "ZXCVBNM"
+                    ];
+                    
+                    // Calculate dynamic key size to fit screen width
+                    const gap = 12;
+                    const maxRowLength = 10; // Row 1 has 10 chars
+                    const availableWidth = canvas.width * 0.9; // 90% of screen width
+                    let keySize = (availableWidth - (maxRowLength * gap)) / maxRowLength;
+                    
+                    // Clamp key size so it's not too huge or too small
+                    keySize = Math.min(90, Math.max(50, keySize));
+                    
+                    const totalHeight = rows.length * (keySize + gap) - gap;
+                    const startY = (canvas.height - totalHeight) / 2;
+
+                    rows.forEach((row, rIndex) => {
+                        const rowWidth = row.length * (keySize + gap) - gap;
+                        const startX = (canvas.width - rowWidth) / 2;
+                        
+                        for (let i = 0; i < row.length; i++) {
+                            keys.push({
+                                char: row[i],
+                                x: startX + i * (keySize + gap),
+                                y: startY + rIndex * (keySize + gap),
+                                w: keySize,
+                                h: keySize
+                            });
+                        }
+                    });
+                }
+            }
+
+            function showStartScreen() {
+                gameState.isPlaying = false;
+                modalLayer.classList.remove('hidden');
+                gameOverScreen.classList.add('hidden');
+                startScreen.classList.remove('hidden');
+                updateMenuHighScores();
+            }
+
+            function startGame(mode) {
+                gameState.mode = mode;
+                gameState.score = 0;
+                gameState.health = 3;
+                gameState.isPlaying = true;
+                enemies = [];
+                particles = [];
+                spawnTimer = 0;
+                screenShake = 0;
+                
+                modeDisplay.textContent = `Mode: ${mode.toUpperCase()}`;
+                endModeTitle.textContent = `Mode: ${mode.toUpperCase()}`;
+
+                initKeys(mode);
+
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                
+                if (mode === 'classic') {
+                    ninja.x = centerX;
+                    ninja.y = centerY - 150; // Start slightly above
+                } else {
+                    ninja.x = centerX;
+                    ninja.y = centerY;
+                }
+                
+                ninja.isDashing = false;
+                ninja.invulnerableUntil = 0;
+                ninja.dashStartPos = {x: ninja.x, y: ninja.y};
+                ninja.dashTargetPos = {x: ninja.x, y: ninja.y};
+
+                scoreDisplay.textContent = 0;
+                healthDisplay.textContent = 3;
+                modalLayer.classList.add('hidden');
+
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                gameState.lastTime = performance.now();
+                loop(gameState.lastTime);
+            }
+
+            function gameOver() {
+                gameState.isPlaying = false;
+                finalScoreDisplay.textContent = gameState.score;
+                
+                const currentHigh = highScores[gameState.mode];
+                endHighScoreDisplay.textContent = currentHigh;
+
+                if (gameState.score > currentHigh) {
+                    highScores[gameState.mode] = gameState.score;
+                    localStorage.setItem(`hs_${gameState.mode}`, gameState.score);
+                    endHighScoreDisplay.textContent = gameState.score;
+                    newRecordMsg.classList.remove('hidden');
+                } else {
+                    newRecordMsg.classList.add('hidden');
+                }
+
+                modalLayer.classList.remove('hidden');
+                startScreen.classList.add('hidden');
+                gameOverScreen.classList.remove('hidden');
+            }
+
+            // --- Mechanics ---
+
+            function spawnEnemy() {
+                let x, y;
+                const side = Math.floor(Math.random() * 4); 
+                const buffer = 50;
+
+                switch(side) {
+                    case 0: x = Math.random() * canvas.width; y = -buffer; break;
+                    case 1: x = canvas.width + buffer; y = Math.random() * canvas.height; break;
+                    case 2: x = Math.random() * canvas.width; y = canvas.height + buffer; break;
+                    case 3: x = -buffer; y = Math.random() * canvas.height; break;
+                }
+
+                const speedMult = 1 + (gameState.score / 400);
+                const modeMult = gameState.mode === 'hardcore' ? 1.3 : 1.0;
+
+                enemies.push({
+                    x: x, y: y,
+                    speed: CONFIG.enemyBaseSpeed * speedMult * modeMult * (0.8 + Math.random() * 0.4),
+                    radius: CONFIG.enemySize,
+                    color: '#ff3333'
+                });
+            }
+
+            function checkLineCollision(p1, p2, circle) {
+                const A = circle.x - p1.x, B = circle.y - p1.y;
+                const C = p2.x - p1.x, D = p2.y - p1.y;
+                const dot = A * C + B * D;
+                const len_sq = C * C + D * D;
+                let param = -1;
+                if (len_sq !== 0) param = dot / len_sq;
+
+                let xx, yy;
+                if (param < 0) { xx = p1.x; yy = p1.y; } 
+                else if (param > 1) { xx = p2.x; yy = p2.y; } 
+                else { xx = p1.x + param * C; yy = p1.y + param * D; }
+
+                const dx = circle.x - xx, dy = circle.y - yy;
+                return Math.sqrt(dx * dx + dy * dy) < circle.radius + 20;
+            }
+
+            function createParticles(x, y, color, count) {
+                for(let i=0; i<count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 5 + 2;
+                    particles.push({
+                        x, y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 1.0, color
+                    });
+                }
+            }
+
+            function takeDamage() {
+                if (Date.now() < ninja.invulnerableUntil) return;
+                gameState.health--;
+                healthDisplay.textContent = gameState.health;
+                screenShake = 20;
+                damageOverlay.style.opacity = 1;
+                setTimeout(() => { damageOverlay.style.opacity = 0; }, 200);
+
+                if (gameState.health <= 0) gameOver();
+                else ninja.invulnerableUntil = Date.now() + 1000;
+            }
+
+            window.addEventListener('keydown', (e) => {
+                if (!gameState.isPlaying) return;
+                const targetKey = keys.find(k => k.char === e.key.toUpperCase());
+                if (targetKey) {
+                    handleDash(targetKey);
+                }
+            });
+
+            function handleDash(targetKey) {
+                const oldX = ninja.x, oldY = ninja.y;
+                ninja.x = targetKey.x + targetKey.w/2;
+                ninja.y = targetKey.y + targetKey.h/2;
+                
+                ninja.isDashing = true;
+                ninja.dashStartPos = {x: oldX, y: oldY};
+                ninja.dashTargetPos = {x: ninja.x, y: ninja.y};
+                ninja.dashStartTime = Date.now();
+                ninja.invulnerableUntil = Date.now() + CONFIG.dashInvulnerability;
+
+                let hitCount = 0;
+                for (let i = enemies.length - 1; i >= 0; i--) {
+                    const enemy = enemies[i];
+                    if (checkLineCollision(ninja.dashStartPos, ninja.dashTargetPos, enemy)) {
+                        createParticles(enemy.x, enemy.y, '#a0a', 10);
+                        enemies.splice(i, 1);
+                        gameState.score += 10;
+                        scoreDisplay.textContent = gameState.score;
+                        hitCount++;
+                    }
+                }
+                if (hitCount > 0) screenShake = Math.min(20, hitCount * 3);
+            }
+
+            // --- Loop ---
+
+            function update(dt) {
+                spawnTimer += dt;
+                const currentSpawnRate = Math.max(400, CONFIG.spawnRate - (gameState.score * 3));
+                
+                if (spawnTimer > currentSpawnRate) {
+                    spawnEnemy();
+                    spawnTimer = 0;
+                }
+
+                const currentTime = Date.now();
+                
+                enemies.forEach(enemy => {
+                    const dx = ninja.x - enemy.x;
+                    const dy = ninja.y - enemy.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist > 0) {
+                        enemy.x += (dx / dist) * enemy.speed;
+                        enemy.y += (dy / dist) * enemy.speed;
+                    }
+
+                    const isInvulnerable = currentTime < ninja.invulnerableUntil;
+                    if (!isInvulnerable && dist < (CONFIG.ninjaSize + enemy.radius)) {
+                        takeDamage();
+                        createParticles(ninja.x, ninja.y, '#fff', 8);
+                    }
+                });
+
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    let p = particles[i];
+                    p.x += p.vx; p.y += p.vy;
+                    p.life -= 0.04;
+                    if (p.life <= 0) particles.splice(i, 1);
+                }
+                if (screenShake > 0) screenShake *= 0.9;
+                if (screenShake < 0.5) screenShake = 0;
+            }
+
+            function draw() {
+                // Background
+                if (bgImage.complete) {
+                    ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+                } else {
+                    ctx.fillStyle = '#0a0a0c';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+
+                // Dark Overlay
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.save();
+                if (screenShake > 0) {
+                    const rx = (Math.random() - 0.5) * screenShake;
+                    const ry = (Math.random() - 0.5) * screenShake;
+                    ctx.translate(rx, ry);
+                }
+
+                // Keys
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                keys.forEach(k => {
+                    const isTarget = (ninja.x > k.x && ninja.x < k.x + k.w && ninja.y > k.y && ninja.y < k.y + k.h);
+                    
+                    ctx.fillStyle = isTarget ? 'rgba(0, 255, 204, 0.2)' : 'rgba(0, 0, 0, 0.6)';
+                    ctx.strokeStyle = isTarget ? '#00ffcc' : '#444';
+                    ctx.lineWidth = isTarget ? 3 : 1;
+
+                    if (gameState.mode === 'hardcore') {
+                        ctx.beginPath();
+                        ctx.arc(k.x + k.w/2, k.y + k.h/2, k.w/2, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath();
+                        ctx.roundRect(k.x, k.y, k.w, k.h, 10);
+                        ctx.fill();
+                        ctx.stroke();
+                    }
+
+                    // Dynamic font sizing for responsive keys
+                    const fontSize = k.w > 60 ? 30 : 20;
+                    
+                    ctx.fillStyle = isTarget ? '#fff' : '#888';
+                    ctx.font = `bold ${fontSize}px 'Orbitron', monospace`;
+                    ctx.fillText(k.char, k.x + k.w/2, k.y + k.h/2);
+                });
+
+                // Slash
+                const timeSinceDash = Date.now() - ninja.dashStartTime;
+                if (timeSinceDash < CONFIG.slashDuration) {
+                    const opacity = 1 - (timeSinceDash / CONFIG.slashDuration);
+                    ctx.beginPath();
+                    ctx.moveTo(ninja.dashStartPos.x, ninja.dashStartPos.y);
+                    ctx.lineTo(ninja.dashTargetPos.x, ninja.dashTargetPos.y);
+                    ctx.strokeStyle = `rgba(0, 255, 204, ${opacity})`;
+                    ctx.lineWidth = 8;
+                    ctx.lineCap = 'round';
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#00ffcc';
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+
+                // Enemies
+                enemies.forEach(e => {
+                    drawMonster(ctx, e.x, e.y, 1);
+                });
+
+                // Particles
+                particles.forEach(p => {
+                    ctx.globalAlpha = p.life;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                });
+
+                // Ninja
+                const isInvulnerable = Date.now() < ninja.invulnerableUntil;
+                const ninjaOpacity = (isInvulnerable && Math.floor(Date.now() / 50) % 2 === 0) ? 0.4 : 1;
+                drawNinja(ctx, ninja.x, ninja.y, ninjaOpacity);
+
+                ctx.restore();
+            }
+
+            function loop(timestamp) {
+                if (!gameState.isPlaying) return;
+                const dt = timestamp - gameState.lastTime;
+                gameState.lastTime = timestamp;
+                update(dt);
+                draw();
+                animationFrameId = requestAnimationFrame(loop);
+            }
+
+            // --- Events ---
+            document.getElementById('btnClassic').addEventListener('click', () => startGame('classic'));
+            document.getElementById('btnHardcore').addEventListener('click', () => startGame('hardcore'));
+            document.getElementById('btnRetry').addEventListener('click', () => startGame(gameState.mode));
+            document.getElementById('btnMenu').addEventListener('click', showStartScreen);
+
+            resize();
+            showStartScreen();
+        };
+    </script>
+</body>
+</html>
